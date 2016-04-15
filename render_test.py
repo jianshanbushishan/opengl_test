@@ -9,21 +9,54 @@ from numpy import array
 from scipy.misc import imread
 
 VERTEXS = array([
-    0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, # Top Right
-    0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, # Bottom Right
-    -0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, # Bottom Left
-    -0.5, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, # Top Left
-    ], 'f')
+    -0.5, -0.5, -0.5,  0.0, 0.0,
+     0.5, -0.5, -0.5,  1.0, 0.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 0.0,
 
-INDICES = array([0, 1, 2, 0, 3, 2], 'I')
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 1.0,
+     0.5,  0.5,  0.5,  1.0, 1.0,
+    -0.5,  0.5,  0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5, -0.5,  1.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5,  0.5,  1.0, 0.0,
+
+     0.5,  0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5,  0.5,  0.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+     0.5, -0.5, -0.5,  1.0, 1.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+     0.5, -0.5,  0.5,  1.0, 0.0,
+    -0.5, -0.5,  0.5,  0.0, 0.0,
+    -0.5, -0.5, -0.5,  0.0, 1.0,
+
+    -0.5,  0.5, -0.5,  0.0, 1.0,
+     0.5,  0.5, -0.5,  1.0, 1.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+     0.5,  0.5,  0.5,  1.0, 0.0,
+    -0.5,  0.5,  0.5,  0.0, 0.0,
+    -0.5,  0.5, -0.5,  0.0, 1.0
+    ], 'f')
 
 VERTEX_SHADERSOURCE = """
 #version 330 core
 layout (location = 0) in vec3 position;
-layout (location = 1) in vec3 color;
-layout (location = 2) in vec2 texCoord;
+layout (location = 1) in vec2 texCoord;
 
-out vec3 ourColor;
 out vec2 TexCoord;
 
 uniform mat4 model;
@@ -33,13 +66,11 @@ uniform mat4 projection;
 void main()
 {
     gl_Position = projection*view*model*vec4(position, 1.0f);
-    ourColor = color;
     TexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
 }"""
 
 FRAGMENT_SHADERSOURCE = """
 #version 330 core
-in vec3 ourColor;
 in vec2 TexCoord;
 out vec4 color;
 
@@ -91,6 +122,7 @@ def main():
     tex = bind_texture("wall.png")
     tex2 = bind_texture("wall2.jpg")
     gl.glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+    gl.glEnable(gl.GL_DEPTH_TEST)
 
     # Loop until the user closes the window
     while not glfw.window_should_close(window):
@@ -109,7 +141,7 @@ def main():
 
 def render(shader, vao, tex, tex2):
     gl.glClearColor(0.2, 0.3, 0.3, 0.4)
-    gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+    gl.glClear(gl.GL_COLOR_BUFFER_BIT|gl.GL_DEPTH_BUFFER_BIT)
 
     gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
     gl.glUseProgram(shader)
@@ -133,7 +165,7 @@ def render(shader, vao, tex, tex2):
     view_matrix = array([
         [0.8, 0, 0, 0],
         [0, 0.8, 0, 0],
-        [0, 0, 0.8, -3],
+        [0, 0, 0.8, -4],
         [0, 0, 0, 1],
         ])
     gl.glUniformMatrix4fv(view, 1, gl.GL_TRUE, view_matrix)
@@ -141,7 +173,7 @@ def render(shader, vao, tex, tex2):
     projection_matrix = get_projection_matrix(45, WINDOW_WIDTH/WINDOW_HEIGHT, 0.1, 100)
     gl.glUniformMatrix4fv(projection, 1, gl.GL_FALSE, projection_matrix)
     gl.glBindVertexArray(vao)
-    gl.glDrawElements(gl.GL_TRIANGLES, INDICES.size, gl.GL_UNSIGNED_INT, None)
+    gl.glDrawArrays(gl.GL_TRIANGLES, 0, VERTEXS.size)
     gl.glBindVertexArray(0)
     gl.glUseProgram(0)
 
@@ -159,29 +191,20 @@ def get_vertex():
     gl.glBindVertexArray(vertex_array_object)
     _vbo = vbo.VBO(VERTEXS)
     _vbo.bind()
-    _ebo = vbo.VBO(INDICES, target=gl.GL_ELEMENT_ARRAY_BUFFER)
-    _ebo.bind()
     gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, False,
-                             8*ctypes.sizeof(ctypes.c_float),
+                             5*ctypes.sizeof(ctypes.c_float),
                              ctypes.c_void_p(0))
     gl.glEnableVertexAttribArray(0)
 
-    gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, False,
-                             8*ctypes.sizeof(ctypes.c_float),
+    gl.glVertexAttribPointer(1, 2, gl.GL_FLOAT, False,
+                             5*ctypes.sizeof(ctypes.c_float),
                              ctypes.c_void_p(3*ctypes.sizeof(ctypes.c_float)))
     gl.glEnableVertexAttribArray(1)
-
-    gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, False,
-                             8*ctypes.sizeof(ctypes.c_float),
-                             ctypes.c_void_p(6*ctypes.sizeof(ctypes.c_float)))
-    gl.glEnableVertexAttribArray(2)
 
     gl.glBindVertexArray(0)
     gl.glDisableVertexAttribArray(0)
     gl.glDisableVertexAttribArray(1)
-    gl.glDisableVertexAttribArray(2)
     _vbo.unbind()
-    _ebo.unbind()
 
     return vertex_array_object
 
