@@ -1,23 +1,21 @@
+import ctypes
+import time
+from math import sin, cos, tan, radians, pi
 import glfw
-from math import sin, cos
 import OpenGL.GL as gl
 from OpenGL.GL import shaders
 from OpenGL.arrays import vbo
 from numpy import array
 from scipy.misc import imread
-import ctypes
-import time
-import numpy
-import random
 
-VERTEXS = array( [
-         0.5,  0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0,# Top Right
-         0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,# Bottom Right
-        -0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,# Bottom Left
-        -0.5,  0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, # Top Left
-        ],'f')
+VERTEXS = array([
+    0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, # Top Right
+    0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, # Bottom Right
+    -0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, # Bottom Left
+    -0.5, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, # Top Left
+    ], 'f')
 
-INDICES = array([ 0, 1, 2, 0, 3, 2 ], 'I')
+INDICES = array([0, 1, 2, 0, 3, 2], 'I')
 
 VERTEX_SHADERSOURCE = """
 #version 330 core
@@ -27,10 +25,14 @@ layout (location = 2) in vec2 texCoord;
 
 out vec3 ourColor;
 out vec2 TexCoord;
-uniform mat4 transform;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
 void main()
 {
-    gl_Position = transform * vec4(position, 1.0f);
+    gl_Position = projection*view*model*vec4(position, 1.0f);
     ourColor = color;
     TexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
 }"""
@@ -49,13 +51,13 @@ void main()
     color = mix(texture(ourTexture1, TexCoord), texture(ourTexture2, TexCoord), 0.2);
 }"""
 
-WINDOW_WIDTH  = 800
+WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 
-def main():
+def init_window():
     # Initialize the library
     if not glfw.init():
-        return
+        return None
 
     glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
@@ -66,102 +68,112 @@ def main():
     window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, "OpenGL Example", None, None)
     if not window:
         glfw.terminate()
-        return
+        return None
 
     # Make the window's context current
     glfw.make_context_current(window)
     glfw.set_key_callback(window, key_cb)
+    return window
 
+def get_shader():
     vertex_shader = shaders.compileShader(VERTEX_SHADERSOURCE, gl.GL_VERTEX_SHADER)
     fragment_shader = shaders.compileShader(FRAGMENT_SHADERSOURCE, gl.GL_FRAGMENT_SHADER)
     shader = shaders.compileProgram(vertex_shader, fragment_shader)
+    return shader
 
-    gl.glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
-    vao = get_vertex(shader)
+def main():
+    window = init_window()
+    if not window:
+        return
+
+    shader = get_shader()
+    vao = get_vertex()
     tex = bind_texture("wall.png")
     tex2 = bind_texture("wall2.jpg")
+    gl.glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
 
-    # vertexColorLocation = gl.glGetUniformLocation(shader, "ourColor");
     # Loop until the user closes the window
     while not glfw.window_should_close(window):
         # Poll for and process events
         glfw.poll_events()
 
         # Render here, e.g. using pyOpenGL
-        gl.glClearColor(0.2, 0.3, 0.3, 0.4)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
-        gl.glUseProgram(shader)
-        gl.glActiveTexture(gl.GL_TEXTURE0);
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex);
-        gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture1"), 0);
-        gl.glActiveTexture(gl.GL_TEXTURE1);
-        gl.glBindTexture(gl.GL_TEXTURE_2D, tex2);
-        gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture2"), 1);  
-        
-        transform = gl.glGetUniformLocation(shader, "transform")
-        gl.glUniformMatrix4fv(transform, 1, gl.GL_TRUE, get_trans_matrix())
-        gl.glBindVertexArray(vao);
-        gl.glDrawElements(gl.GL_TRIANGLES, INDICES.size, gl.GL_UNSIGNED_INT, None);
-        gl.glBindVertexArray(0);
-        gl.glUseProgram(0)
+        render(shader, vao, tex, tex2)
 
         # Swap front and back buffers
         glfw.swap_buffers(window)
         time.sleep(0.05)
 
-    # gl.glDeleteVertexArrays(vao);
+    gl.glDeleteVertexArrays(1, vao)
     glfw.terminate()
 
-def get_trans_matrix():
-    rand_val = random.random()
-    t = glfw.get_time()
-    scale_factor = abs(sin(t))+0.1
-    move_x = sin(t)/3
-    move_y = cos(t)/3
-    rotate_angle = t
-    scale_matx = array([
-            [scale_factor, 0,   0, 0],
-            [0,   scale_factor, 0, 0],
-            [0,   0,   1, 0],
-            [0,   0,   0, 1],
-            ])
-    rotate_matx = array([
-            [cos(rotate_angle),  -sin(rotate_angle),   0, 0],
-            [sin(rotate_angle),  cos(rotate_angle),   0, 0],
-            [0,   0,   1, 0],
-            [0,   0,   0, 1],
-            ])
-    move_matx = array([
-            [1,   0,   0, move_x],
-            [0,   1,   0, move_y],
-            [0,   0,   1, 0],
-            [0,   0,   0, 1],
-            ])
-    trans_matx = move_matx.dot(rotate_matx).dot(scale_matx)
-    return trans_matx
+def render(shader, vao, tex, tex2):
+    gl.glClearColor(0.2, 0.3, 0.3, 0.4)
+    gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
-def get_vertex(shader):
+    gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+    gl.glUseProgram(shader)
+    gl.glActiveTexture(gl.GL_TEXTURE0)
+    gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
+    gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture1"), 0)
+    gl.glActiveTexture(gl.GL_TEXTURE1)
+    gl.glBindTexture(gl.GL_TEXTURE_2D, tex2)
+    gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture2"), 1)
+
+    model = gl.glGetUniformLocation(shader, "model")
+    angel = glfw.get_time()%360
+    model_matrix = array([
+        [1, 0, 0, 0],
+        [0, cos(angel), -sin(angel), 0],
+        [0, sin(angel), cos(angel), 0],
+        [0, 0, 0, 1],
+        ])
+    gl.glUniformMatrix4fv(model, 1, gl.GL_TRUE, model_matrix)
+    view = gl.glGetUniformLocation(shader, "view")
+    view_matrix = array([
+        [0.8, 0, 0, 0],
+        [0, 0.8, 0, 0],
+        [0, 0, 0.8, -3],
+        [0, 0, 0, 1],
+        ])
+    gl.glUniformMatrix4fv(view, 1, gl.GL_TRUE, view_matrix)
+    projection = gl.glGetUniformLocation(shader, "projection")
+    projection_matrix = get_projection_matrix(45, WINDOW_WIDTH/WINDOW_HEIGHT, 0.1, 100)
+    gl.glUniformMatrix4fv(projection, 1, gl.GL_FALSE, projection_matrix)
+    gl.glBindVertexArray(vao)
+    gl.glDrawElements(gl.GL_TRIANGLES, INDICES.size, gl.GL_UNSIGNED_INT, None)
+    gl.glBindVertexArray(0)
+    gl.glUseProgram(0)
+
+def get_projection_matrix(fov, aspect, zN, zF):
+    fov = radians(fov/2)
+    h = 1.0/tan(fov)
+    return array([[h/aspect, 0.0, 0.0, 0.0],
+                  [0.0, h, 0.0, 0.0],
+                  [0.0, 0.0, (zF+zN)/(zN-zF), -1.0],
+                  [0.0, 0.0, 2.0*zF*zN/(zN-zF), 0.0]],
+                 'f')
+
+def get_vertex():
     vertex_array_object = gl.glGenVertexArrays(1)
-    gl.glBindVertexArray( vertex_array_object )
+    gl.glBindVertexArray(vertex_array_object)
     _vbo = vbo.VBO(VERTEXS)
     _vbo.bind()
-    _ebo = vbo.VBO(INDICES, target = gl.GL_ELEMENT_ARRAY_BUFFER)
+    _ebo = vbo.VBO(INDICES, target=gl.GL_ELEMENT_ARRAY_BUFFER)
     _ebo.bind()
     gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, False,
-            8*ctypes.sizeof(ctypes.c_float),
-            ctypes.c_void_p(0))
+                             8*ctypes.sizeof(ctypes.c_float),
+                             ctypes.c_void_p(0))
     gl.glEnableVertexAttribArray(0)
 
     gl.glVertexAttribPointer(1, 3, gl.GL_FLOAT, False,
-            8*ctypes.sizeof(ctypes.c_float),
-            ctypes.c_void_p(3*ctypes.sizeof(ctypes.c_float)))
+                             8*ctypes.sizeof(ctypes.c_float),
+                             ctypes.c_void_p(3*ctypes.sizeof(ctypes.c_float)))
     gl.glEnableVertexAttribArray(1)
 
     gl.glVertexAttribPointer(2, 2, gl.GL_FLOAT, False,
-            8*ctypes.sizeof(ctypes.c_float),
-            ctypes.c_void_p(6*ctypes.sizeof(ctypes.c_float)))
+                             8*ctypes.sizeof(ctypes.c_float),
+                             ctypes.c_void_p(6*ctypes.sizeof(ctypes.c_float)))
     gl.glEnableVertexAttribArray(2)
 
     gl.glBindVertexArray(0)
@@ -174,18 +186,21 @@ def get_vertex(shader):
     return vertex_array_object
 
 def bind_texture(img_name):
+    """
+    open image file and use it to generate texture
+    """
     tex = gl.glGenTextures(1)
     gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
     gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
     gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR);
-    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR);
+    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+    gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
     im = imread(img_name)
     (width, height, _) = im.shape
     image_bytes = im.data.tobytes()
-    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB, 
-            width, height, 0, gl.GL_RGB,
-            gl.GL_UNSIGNED_BYTE, image_bytes)
+    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB,
+                    width, height, 0, gl.GL_RGB,
+                    gl.GL_UNSIGNED_BYTE, image_bytes)
     gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
     gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
     return tex
