@@ -15,31 +15,37 @@ VERTEXS = array( [
         -0.5,  0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, # Top Left
         ],'f')
 
-INDICES = array([ 0, 1, 3, 1, 2, 3 ], 'I')
+INDICES = array([ 0, 1, 2, 0, 3, 2 ], 'I')
 
 VERTEX_SHADERSOURCE = """
-    #version 330 core
-    layout (location = 0) in vec3 position;
-    layout (location = 1) in vec3 color;
-    layout (location = 2) in vec2 texCoord;
-    out vec3 ourColor;
-    out vec2 TexCoord;
-    void main()
-    {
-        gl_Position = vec4(position, 1.0);
-        ourColor = color;
-        TexCoord = texCoord;
-    }"""
+#version 330 core
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 color;
+layout (location = 2) in vec2 texCoord;
+
+out vec3 ourColor;
+out vec2 TexCoord;
+
+void main()
+{
+    gl_Position = vec4(position, 1.0f);
+    ourColor = color;
+    TexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
+}"""
+
 FRAGMENT_SHADERSOURCE = """
-    #version 330 core
-    in vec3 ourColor;
-    in vec2 TexCoord;
-    out vec4 color;
-    uniform sampler2D ourTexture;
-    void main()
-    {
-        color = texture(ourTexture, TexCoord)* vec4(ourColor, 1.0f);
-    }"""
+#version 330 core
+in vec3 ourColor;
+in vec2 TexCoord;
+out vec4 color;
+
+uniform sampler2D ourTexture1;
+uniform sampler2D ourTexture2;
+
+void main()
+{
+    color = mix(texture(ourTexture1, TexCoord), texture(ourTexture2, TexCoord), 0.2);
+}"""
 
 WINDOW_WIDTH  = 800
 WINDOW_HEIGHT = 600
@@ -71,6 +77,7 @@ def main():
     gl.glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
     vao = get_vertex(shader)
     tex = bind_texture("wall.png")
+    tex2 = bind_texture("wall2.bmp")
 
     # vertexColorLocation = gl.glGetUniformLocation(shader, "ourColor");
     # Loop until the user closes the window
@@ -84,6 +91,13 @@ def main():
 
         gl.glBindTexture(gl.GL_TEXTURE_2D, tex)
         gl.glUseProgram(shader)
+        gl.glActiveTexture(gl.GL_TEXTURE0);
+        gl.glBindTexture(gl.GL_TEXTURE_2D, tex);
+        gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture1"), 0);
+        gl.glActiveTexture(gl.GL_TEXTURE1);
+        gl.glBindTexture(gl.GL_TEXTURE_2D, tex2);
+        gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture2"), 1);  
+
         gl.glBindVertexArray(vao);
         gl.glDrawElements(gl.GL_TRIANGLES, INDICES.size, gl.GL_UNSIGNED_INT, None);
         gl.glBindVertexArray(0);
@@ -137,7 +151,9 @@ def bind_texture(img_name):
     im = imread(img_name)
     (width, height, _) = im.shape
     image_bytes = im.data.tobytes()
-    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB,  width, height, 0, gl.GL_RGB, gl.GL_UNSIGNED_BYTE, image_bytes)
+    gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGB, 
+            width, height, 0, gl.GL_RGB,
+            gl.GL_UNSIGNED_BYTE, image_bytes)
     gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
     gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
     return tex
