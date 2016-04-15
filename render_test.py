@@ -79,7 +79,7 @@ def main():
     gl.glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
     vao = get_vertex(shader)
     tex = bind_texture("wall.png")
-    tex2 = bind_texture("wall2.bmp")
+    tex2 = bind_texture("wall2.jpg")
 
     # vertexColorLocation = gl.glGetUniformLocation(shader, "ourColor");
     # Loop until the user closes the window
