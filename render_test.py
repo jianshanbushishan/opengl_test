@@ -1,5 +1,5 @@
 import glfw
-from math import sin
+from math import sin, cos
 import OpenGL.GL as gl
 from OpenGL.GL import shaders
 from OpenGL.arrays import vbo
@@ -7,6 +7,8 @@ from numpy import array
 from scipy.misc import imread
 import ctypes
 import time
+import numpy
+import random
 
 VERTEXS = array( [
          0.5,  0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0,# Top Right
@@ -25,10 +27,10 @@ layout (location = 2) in vec2 texCoord;
 
 out vec3 ourColor;
 out vec2 TexCoord;
-
+uniform mat4 transform;
 void main()
 {
-    gl_Position = vec4(position, 1.0f);
+    gl_Position = transform * vec4(position, 1.0f);
     ourColor = color;
     TexCoord = vec2(texCoord.x, 1.0 - texCoord.y);
 }"""
@@ -97,7 +99,9 @@ def main():
         gl.glActiveTexture(gl.GL_TEXTURE1);
         gl.glBindTexture(gl.GL_TEXTURE_2D, tex2);
         gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture2"), 1);  
-
+        
+        transform = gl.glGetUniformLocation(shader, "transform")
+        gl.glUniformMatrix4fv(transform, 1, gl.GL_TRUE, get_trans_matrix())
         gl.glBindVertexArray(vao);
         gl.glDrawElements(gl.GL_TRIANGLES, INDICES.size, gl.GL_UNSIGNED_INT, None);
         gl.glBindVertexArray(0);
@@ -109,6 +113,34 @@ def main():
 
     # gl.glDeleteVertexArrays(vao);
     glfw.terminate()
+
+def get_trans_matrix():
+    rand_val = random.random()
+    t = glfw.get_time()
+    scale_factor = abs(sin(t))+0.1
+    move_x = sin(t)/3
+    move_y = cos(t)/3
+    rotate_angle = t
+    scale_matx = array([
+            [scale_factor, 0,   0, 0],
+            [0,   scale_factor, 0, 0],
+            [0,   0,   1, 0],
+            [0,   0,   0, 1],
+            ])
+    rotate_matx = array([
+            [cos(rotate_angle),  -sin(rotate_angle),   0, 0],
+            [sin(rotate_angle),  cos(rotate_angle),   0, 0],
+            [0,   0,   1, 0],
+            [0,   0,   0, 1],
+            ])
+    move_matx = array([
+            [1,   0,   0, move_x],
+            [0,   1,   0, move_y],
+            [0,   0,   1, 0],
+            [0,   0,   0, 1],
+            ])
+    trans_matx = move_matx.dot(rotate_matx).dot(scale_matx)
+    return trans_matx
 
 def get_vertex(shader):
     vertex_array_object = gl.glGenVertexArrays(1)
