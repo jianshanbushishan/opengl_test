@@ -52,6 +52,18 @@ VERTEXS = array([
     -0.5,  0.5, -0.5,  0.0, 1.0
     ], 'f')
 
+CUBEPOSITIONS = (
+    ( 0.0,  0.0,  0.0), 
+    ( 2.0,  5.0, -15.0), 
+    (-1.5, -2.2, -2.5),  
+    (-3.8, -2.0, -12.3),  
+    ( 2.4, -0.4, -3.5),  
+    (-1.7,  3.0, -7.5),  
+    ( 1.3, -2.0, -2.5),  
+    ( 1.5,  2.0, -2.5), 
+    ( 1.5,  0.2, -1.5), 
+    (-1.3,  1.0, -1.5)  
+        )
 VERTEX_SHADERSOURCE = """
 #version 330 core
 layout (location = 0) in vec3 position;
@@ -152,15 +164,6 @@ def render(shader, vao, tex, tex2):
     gl.glBindTexture(gl.GL_TEXTURE_2D, tex2)
     gl.glUniform1i(gl.glGetUniformLocation(shader, "ourTexture2"), 1)
 
-    model = gl.glGetUniformLocation(shader, "model")
-    angel = glfw.get_time()%360
-    model_matrix = array([
-        [1, 0, 0, 0],
-        [0, cos(angel), -sin(angel), 0],
-        [0, sin(angel), cos(angel), 0],
-        [0, 0, 0, 1],
-        ])
-    gl.glUniformMatrix4fv(model, 1, gl.GL_TRUE, model_matrix)
     view = gl.glGetUniformLocation(shader, "view")
     view_matrix = array([
         [0.8, 0, 0, 0],
@@ -173,7 +176,12 @@ def render(shader, vao, tex, tex2):
     projection_matrix = get_projection_matrix(45, WINDOW_WIDTH/WINDOW_HEIGHT, 0.1, 100)
     gl.glUniformMatrix4fv(projection, 1, gl.GL_FALSE, projection_matrix)
     gl.glBindVertexArray(vao)
-    gl.glDrawArrays(gl.GL_TRIANGLES, 0, VERTEXS.size)
+    for idx in range(0, len(CUBEPOSITIONS)):
+        model = gl.glGetUniformLocation(shader, "model")
+        angel = glfw.get_time()%360
+        model_matrix = get_model_matrix(idx, angel)
+        gl.glUniformMatrix4fv(model, 1, gl.GL_TRUE, model_matrix)
+        gl.glDrawArrays(gl.GL_TRIANGLES, 0, VERTEXS.size)
     gl.glBindVertexArray(0)
     gl.glUseProgram(0)
 
@@ -185,6 +193,15 @@ def get_projection_matrix(fov, aspect, zN, zF):
                   [0.0, 0.0, (zF+zN)/(zN-zF), -1.0],
                   [0.0, 0.0, 2.0*zF*zN/(zN-zF), 0.0]],
                  'f')
+
+def get_model_matrix(index, angel):
+    (x, y, z) = CUBEPOSITIONS[index]
+    return array([
+        [1, 0, 0, x],
+        [0, cos(angel), -sin(angel), y],
+        [0, sin(angel), cos(angel), z],
+        [0, 0, 0, 1],
+        ])
 
 def get_vertex():
     vertex_array_object = gl.glGenVertexArrays(1)
